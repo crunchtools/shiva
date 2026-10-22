@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir . && \
     dnf clean all
 
 LABEL name="shiva" \
-      version="1.0.0" \
+      version="1.0.1" \
       summary="Mass SSH client: run one shell command on many hosts in parallel" \
       maintainer="crunchtools.com" \
       url="https://github.com/crunchtools/shiva" \
