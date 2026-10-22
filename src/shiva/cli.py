@@ -23,6 +23,7 @@ EXIT_USAGE = 2
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """The argparse parser; flags are documented in the README."""
     parser = argparse.ArgumentParser(
         prog="shiva",
         description="Run one shell command on many hosts over ssh, in parallel.",
@@ -128,6 +129,7 @@ def _execute(args: argparse.Namespace, config: Config, katello: KatelloClient | 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Entry point. Returns 0 (all ok), 1 (a host failed) or 2 (usage error)."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

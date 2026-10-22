@@ -28,6 +28,13 @@ def parse_hosts(lines: Iterable[str]) -> list[str]:
     return list(seen)
 
 
+def _read_hosts(path: Path) -> list[str]:
+    try:
+        return parse_hosts(path.read_text(encoding="utf-8").splitlines())
+    except (OSError, UnicodeError) as exc:
+        raise HostsError(f"cannot read host list {path}: {exc}") from None
+
+
 def group_path(config: Config, name: str) -> Path | None:
     """Return the group file for NAME inside group_files, refusing path escapes."""
     if not name or "/" in name or name in {".", ".."}:
@@ -37,15 +44,17 @@ def group_path(config: Config, name: str) -> Path | None:
 
 
 def list_groups(config: Config, katello: KatelloClient | None) -> list[str]:
+    """Local group files, then Katello host collections not shadowed by one."""
     local = sorted(p.name for p in config.group_files.glob("*") if p.is_file())
     remote = katello.host_collections() if katello else []
     return local + [name for name in remote if name not in local]
 
 
 def group_members(config: Config, name: str, katello: KatelloClient | None) -> list[str]:
+    """Hosts in a local group file, else in the Katello host collection NAME."""
     path = group_path(config, name)
     if path is not None:
-        return parse_hosts(path.read_text(encoding="utf-8").splitlines())
+        return _read_hosts(path)
     if katello is not None:
         members = katello.hosts_in_collection(name)
         if members:
@@ -68,7 +77,7 @@ def resolve_hosts(
         path = Path(file).expanduser()
         if not path.is_file():
             raise HostsError(f"host file not found: {path}")
-        hosts = parse_hosts(path.read_text(encoding="utf-8").splitlines())
+        hosts = _read_hosts(path)
     elif group is not None:
         hosts = group_members(config, group, katello)
     else:

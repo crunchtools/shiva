@@ -11,6 +11,7 @@ from shiva.cli import EXIT_FAILED, EXIT_OK, EXIT_USAGE, main
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from email.message import EmailMessage
     from pathlib import Path
 
     from tests.conftest import FakeSSH
@@ -73,7 +74,7 @@ def test_one_failed_host_exits_one(
 
 def test_default_group_used_without_source(config_file: Path, fake_ssh: FakeSSH) -> None:
     assert main(["-c", str(config_file), "true"]) == EXIT_OK
-    assert [c[0][c[0].index("--") + 1] for c in fake_ssh.calls] == ["alpha", "beta"]
+    assert sorted(c[0][c[0].index("--") + 1] for c in fake_ssh.calls) == ["alpha", "beta"]
 
 
 def test_hosts_from_piped_stdin(
@@ -81,7 +82,7 @@ def test_hosts_from_piped_stdin(
 ) -> None:
     stdin("db1\ndb2\n", False)
     assert main(["-c", str(config_file), "true"]) == EXIT_OK
-    assert [c[0][c[0].index("--") + 1] for c in fake_ssh.calls] == ["db1", "db2"]
+    assert sorted(c[0][c[0].index("--") + 1] for c in fake_ssh.calls) == ["db1", "db2"]
 
 
 def test_hosts_from_dash_file(
@@ -136,3 +137,30 @@ def test_email_failure_does_not_change_exit(
     monkeypatch.setattr("shiva.cli.send_email", refuse)
     assert main(["-c", str(config_file), "--email", "ops@example.com", "true"]) == EXIT_OK
     assert "could not send email" in capsys.readouterr().err
+
+
+def test_email_sent(
+    config_file: Path, fake_ssh: FakeSSH, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent: list[tuple[str, EmailMessage]] = []
+
+    class FakeSMTP:
+        def __init__(self, host: str) -> None:
+            self.host = host
+
+        def __enter__(self) -> FakeSMTP:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def send_message(self, message: EmailMessage) -> None:
+            sent.append((self.host, message))
+
+    monkeypatch.setattr("shiva.report.smtplib.SMTP", FakeSMTP)
+    assert main(["-c", str(config_file), "-q", "--email", "ops@example.com", "uptime"]) == EXIT_OK
+    [(host, message)] = sent
+    assert host == "localhost"
+    assert message["To"] == "ops@example.com"
+    assert message["Subject"] == "Shiva complete: uptime"
+    assert "=== Successful (2) ===\nalpha\nbeta" in message.get_content()

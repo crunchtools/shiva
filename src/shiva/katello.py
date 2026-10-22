@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -19,6 +20,8 @@ class KatelloError(Exception):
 
 @dataclass
 class KatelloClient:
+    """Read-only Katello API client using basic auth over verified TLS."""
+
     url: str
     username: str
     password: str
@@ -31,6 +34,8 @@ class KatelloClient:
         url = os.environ.get("KATELLO_URL")
         if not url:
             return None
+        if urlsplit(url).scheme != "https":
+            raise ConfigError("KATELLO_URL must be https://; it carries credentials")
         username = os.environ.get("KATELLO_USERNAME")
         password = read_secret("KATELLO_PASSWORD")
         if not username or not password:
@@ -70,10 +75,12 @@ class KatelloClient:
                 page += 1
 
     def host_collections(self) -> list[str]:
+        """Names of every host collection the user can see, sorted."""
         rows = self._paged("/katello/api/host_collections", {})
         return sorted(str(row["name"]) for row in rows)
 
     def hosts_in_collection(self, name: str) -> list[str]:
+        """Host names in the collection NAME; empty when it does not exist."""
         escaped = name.replace('"', '\\"')
         rows = self._paged("/api/v2/hosts", {"search": f'host_collection = "{escaped}"'})
         return [str(row["name"]) for row in rows]

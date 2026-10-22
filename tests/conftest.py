@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import subprocess
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -50,14 +50,16 @@ class FakeSSH:
     calls: list[tuple[list[str], str]] = field(default_factory=list)
     hang: set[str] = field(default_factory=set)
 
-    def __call__(self, argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def __call__(self, argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
         host = argv[argv.index("--") + 1]
-        script = str(kwargs["input"])
-        self.calls.append((argv, script))
+        self.calls.append((argv, kwargs["input"].decode()))
         if host in self.hang:
-            raise subprocess.TimeoutExpired(argv, float(str(kwargs["timeout"])), b"partial\n")
+            kwargs["stdout"].write(b"partial\n")
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
         code, out, err = self.answers.get(host, (0, f"hello from {host}\n", ""))
-        return subprocess.CompletedProcess(argv, code, out, err)
+        kwargs["stdout"].write(out.encode())
+        kwargs["stderr"].write(err.encode())
+        return subprocess.CompletedProcess(argv, code)
 
 
 @pytest.fixture

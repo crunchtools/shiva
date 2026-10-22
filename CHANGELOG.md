@@ -38,3 +38,8 @@ Python rewrite of the bash script. The last bash version is tag `v0.5-bash`.
 - Commands with quotes, globs or `$` reach the host exactly as typed.
 - Hosts are tracked in memory instead of racing on files in `/tmp`, and a run no
   longer sleeps three seconds per host.
+
+### Security
+- Host output is spooled to temporary files and capped at 1 MiB per stream, so a
+  runaway command cannot exhaust memory.
+- `KATELLO_URL` must be https, since every request carries credentials.

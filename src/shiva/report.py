@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class Run:
+    """A finished run: the command, when it ran, and every result in host order."""
+
     command: str
     started: datetime
     finished: datetime
@@ -28,6 +30,7 @@ class Run:
 
 
 def summary(run: Run) -> str:
+    """Start and end times, then hosts grouped by status with the reason for each."""
     lines = [
         f"Shiva from {socket.gethostname()}: completed, {len(run.results)} host(s)",
         f"Start time: {run.started.isoformat(timespec='seconds')}",
@@ -68,6 +71,7 @@ def write_human(run: Run, stdout: TextIO, stderr: TextIO, *, quiet: bool) -> Non
 
 
 def to_json(run: Run) -> str:
+    """The whole run, output included, as one JSON document."""
     return json.dumps(
         {
             "command": run.command,
@@ -92,6 +96,11 @@ def to_json(run: Run) -> str:
 
 
 def send_email(run: Run, address: str, smtp_host: str = "localhost") -> None:
+    """Mail the summary to ADDRESS through SMTP_HOST.
+
+    Raises OSError, which includes smtplib.SMTPException, when the server
+    cannot be reached or refuses the message.
+    """
     message = EmailMessage()
     message["Subject"] = f"Shiva complete: {run.command}"
     message["From"] = f"shiva@{socket.getfqdn()}"

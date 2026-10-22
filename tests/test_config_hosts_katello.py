@@ -85,6 +85,29 @@ def test_secret_file_wins_and_warns(
     assert capsys.readouterr().err == ""
 
 
+def test_unreadable_config(tmp_path: Path) -> None:
+    path = tmp_path / "shiva.conf"
+    path.write_bytes(b"max_slots=\xff\n")
+    with pytest.raises(ConfigError, match="cannot read"):
+        load_config(str(path))
+
+
+def test_host_file(config_file: Path, tmp_path: Path) -> None:
+    config = load_config(str(config_file))
+    hosts_file = tmp_path / "hosts.txt"
+    hosts_file.write_text("a\nb # comment\n")
+    tty = io.StringIO()
+    assert resolve_hosts(config, file=str(hosts_file), group=None, stdin=tty, katello=None) == [
+        "a",
+        "b",
+    ]
+    with pytest.raises(HostsError, match="not found"):
+        resolve_hosts(config, file=str(tmp_path / "nope"), group=None, stdin=tty, katello=None)
+    hosts_file.write_bytes(b"\xff\n")
+    with pytest.raises(HostsError, match="cannot read"):
+        resolve_hosts(config, file=str(hosts_file), group=None, stdin=tty, katello=None)
+
+
 def test_parse_hosts() -> None:
     assert parse_hosts(["a", "# c", "", " b ", "a", "c # x"]) == ["a", "b", "c"]
 
@@ -143,6 +166,28 @@ def test_katello_http_error() -> None:
         client.hosts_in_collection("web")
 
 
+def test_katello_transport_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    with pytest.raises(KatelloError, match="failed"):
+        _katello(handler).host_collections()
+
+
+def test_katello_invalid_json() -> None:
+    client = _katello(lambda request: httpx.Response(200, text="<html>login</html>"))
+    with pytest.raises(KatelloError, match="failed"):
+        client.host_collections()
+
+
+def test_katello_requires_https(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KATELLO_URL", "http://katello.example.com")
+    monkeypatch.setenv("KATELLO_USERNAME", "admin")
+    monkeypatch.setenv("KATELLO_PASSWORD", "secret")
+    with pytest.raises(ConfigError, match="https"):
+        KatelloClient.from_env()
+
+
 def test_katello_repr_hides_password() -> None:
     assert "secret" not in repr(_katello(lambda request: httpx.Response(200)))
 
@@ -162,4 +207,4 @@ def test_cli_falls_back_to_katello_group(
     monkeypatch.setenv("KATELLO_USERNAME", "admin")
     monkeypatch.setenv("KATELLO_PASSWORD", "secret")
     assert main(["-c", str(config_file), "-g", "db", "true"]) == EXIT_OK
-    assert [c[0][c[0].index("--") + 1] for c in fake_ssh.calls] == ["db-1", "db-2"]
+    assert sorted(c[0][c[0].index("--") + 1] for c in fake_ssh.calls) == ["db-1", "db-2"]

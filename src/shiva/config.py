@@ -23,6 +23,8 @@ class ConfigError(Exception):
 
 @dataclass
 class Config:
+    """Settings from shiva.conf; flags override them in the CLI."""
+
     group_files: Path = Path("/usr/local/etc/shiva")
     max_slots: int = 10
     ssh_timeout: int = 10
@@ -77,11 +79,19 @@ def find_config(explicit: str | None) -> Path | None:
     return None
 
 
+def _read_config(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ConfigError(f"cannot read {path}: {exc}") from None
+
+
 def load_config(explicit: str | None = None) -> Config:
+    """Load the first config found (see find_config), or defaults when there is none."""
     path = find_config(explicit)
     if path is None:
         return Config()
-    pairs = parse_key_values(path.read_text(encoding="utf-8"))
+    pairs = parse_key_values(_read_config(path))
     defaults = Config()
     return Config(
         group_files=Path(pairs.get("group_files", str(defaults.group_files))).expanduser(),
@@ -99,7 +109,7 @@ def load_env_file(path: Path = ENV_FILE) -> None:
     path = path.expanduser()
     if not path.is_file():
         return
-    for key, value in parse_key_values(path.read_text(encoding="utf-8")).items():
+    for key, value in parse_key_values(_read_config(path)).items():
         os.environ.setdefault(key, value)
 
 

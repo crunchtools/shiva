@@ -7,12 +7,13 @@ import re
 import shlex
 import socket
 import subprocess
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -20,12 +21,15 @@ if TYPE_CHECKING:
 SKIP_EXIT = 77
 NO_FACTER_EXIT = 78
 SSH_ERROR_EXIT = 255
+MAX_OUTPUT = 1024 * 1024
 SKIP_MARKER = "shiva: fact not matched"
 NO_FACTER_MARKER = "shiva: facter is not installed"
 FACT_RE = re.compile(r"^(?P<key>[A-Za-z0-9_.:-]+)(?P<op>!?=)(?P<value>.*)$")
 
 
 class Status(StrEnum):
+    """Outcome of one host: ran and exited 0, did not, or skipped by --fact."""
+
     OK = "ok"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -40,24 +44,30 @@ FACT_GATE_EXITS = {
 
 @dataclass(frozen=True)
 class Fact:
+    """A --fact condition: `facter KEY` must print VALUE (or must not, if negate)."""
+
     key: str
     value: str
     negate: bool = False
 
     @classmethod
     def parse(cls, text: str) -> Fact:
+        """Parse KEY=VALUE or KEY!=VALUE. Raises ValueError for anything else."""
         match = FACT_RE.match(text)
         if not match:
             raise ValueError(f"fact must look like KEY=VALUE or KEY!=VALUE, got {text!r}")
         return cls(match["key"], match["value"], negate=match["op"] == "!=")
 
     def test(self) -> str:
+        """Shell test that is true when the fact holds; key and value are quoted."""
         op = "!=" if self.negate else "="
         return f'[ "$(facter {shlex.quote(self.key)})" {op} {shlex.quote(self.value)} ]'
 
 
 @dataclass(frozen=True)
 class RunOptions:
+    """How hosts are reached: login user, timeouts, host key policy, parallelism, facts."""
+
     user: str = "root"
     ssh_timeout: int = 10
     command_timeout: int = 0
@@ -68,6 +78,8 @@ class RunOptions:
 
 @dataclass
 class HostResult:
+    """Result for one host. exit_code is None when ssh never finished; reason explains."""
+
     host: str
     status: Status
     exit_code: int | None
@@ -100,6 +112,7 @@ def build_script(command: str, facts: Sequence[Fact]) -> str:
 
 
 def ssh_argv(host: str, options: RunOptions) -> list[str]:
+    """ssh argv for HOST. `--` precedes the host so a name cannot be read as an option."""
     argv = [
         "ssh",
         "-o", "BatchMode=yes",
@@ -112,6 +125,7 @@ def ssh_argv(host: str, options: RunOptions) -> list[str]:
 
 
 def classify(code: int, stderr: str, facts_requested: bool) -> tuple[Status, str]:
+    """Map an exit code to (status, reason). Fact-gate codes need their stderr marker."""
     gate = FACT_GATE_EXITS.get(code) if facts_requested else None
     if gate is not None and gate[0] in stderr:
         return gate[1], gate[2]
@@ -122,39 +136,45 @@ def classify(code: int, stderr: str, facts_requested: bool) -> tuple[Status, str
     return Status.FAILED, f"exit code {code}"
 
 
-def _text(captured: bytes | str | None) -> str:
-    if captured is None:
-        return ""
-    return captured.decode(errors="replace") if isinstance(captured, bytes) else captured
+def _read_capped(spool: IO[bytes]) -> str:
+    spool.seek(0)
+    head = spool.read(MAX_OUTPUT + 1)
+    text = head[:MAX_OUTPUT].decode(errors="replace")
+    if len(head) > MAX_OUTPUT:
+        text += f"\n[shiva: output truncated at {MAX_OUTPUT} bytes]\n"
+    return text
 
 
 def run_host(host: str, script: str, options: RunOptions) -> HostResult:
+    """Run SCRIPT on HOST. ssh errors and timeouts come back as FAILED results.
+
+    Output is spooled to temporary files rather than memory, and at most
+    MAX_OUTPUT bytes of each stream are kept.
+    """
     start = time.monotonic()
-    timeout = options.command_timeout or None
-    try:
-        proc = subprocess.run(
-            ssh_argv(host, options),
-            input=script,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return HostResult(
-            host, Status.FAILED, None, _text(exc.stdout), _text(exc.stderr),
-            time.monotonic() - start, f"timed out after {options.command_timeout}s",
-        )
-    except OSError as exc:
-        return HostResult(
-            host, Status.FAILED, None, "", "", time.monotonic() - start,
-            f"cannot run ssh: {exc.strerror}",
-        )
-    status, reason = classify(proc.returncode, proc.stderr, bool(options.facts))
-    return HostResult(
-        host, status, proc.returncode, proc.stdout, proc.stderr,
-        time.monotonic() - start, reason,
-    )
+    code: int | None = None
+    reason = ""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        try:
+            proc = subprocess.run(
+                ssh_argv(host, options),
+                input=script.encode(),
+                stdout=out,
+                stderr=err,
+                timeout=options.command_timeout or None,
+                check=False,
+            )
+            code = proc.returncode
+        except subprocess.TimeoutExpired:
+            reason = f"timed out after {options.command_timeout}s"
+        except OSError as exc:
+            reason = f"cannot run ssh: {exc.strerror}"
+        stdout, stderr = _read_capped(out), _read_capped(err)
+    seconds = time.monotonic() - start
+    if code is None:
+        return HostResult(host, Status.FAILED, None, stdout, stderr, seconds, reason)
+    status, reason = classify(code, stderr, bool(options.facts))
+    return HostResult(host, status, code, stdout, stderr, seconds, reason)
 
 
 def run_all(

@@ -70,6 +70,13 @@ def test_timeout_marks_failed_and_keeps_partial_output(fake_ssh: FakeSSH) -> Non
     assert result.stdout == "partial\n"
 
 
+def test_output_is_capped(monkeypatch: pytest.MonkeyPatch, fake_ssh: FakeSSH) -> None:
+    monkeypatch.setattr("shiva.runner.MAX_OUTPUT", 10)
+    fake_ssh.answers["h"] = (0, "0123456789abcdef\n", "")
+    [result] = run_all(["h"], "yes", RunOptions())
+    assert result.stdout == "0123456789\n[shiva: output truncated at 10 bytes]\n"
+
+
 def test_missing_ssh_binary(monkeypatch: pytest.MonkeyPatch) -> None:
     def no_ssh(*args: object, **kwargs: object) -> None:
         raise FileNotFoundError(2, "No such file or directory")
