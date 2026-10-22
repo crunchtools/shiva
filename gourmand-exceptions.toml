@@ -1,0 +1,32 @@
+# Documented exceptions to Gourmand findings, with justification.
+# See constitution.md Section XII / profiles/cli-tool.md Section VI.
+
+[[exceptions]]
+check = "CH001-absolute_paths"
+path = "src/shiva/config.py"
+classification = "by_design"
+justification = "The system config files and the group directory under the usr-local and etc prefixes are the documented search path that shiva 0.x installs used. Keeping them is what lets existing installs upgrade without moving files; each is a fallback after -c and ~/.config/shiva."
+
+[[exceptions]]
+check = "EV013-hidden_env_config"
+path = "src/shiva/katello.py"
+classification = "by_design"
+justification = "KATELLO_URL, KATELLO_USERNAME and KATELLO_CA_BUNDLE are the environment configuration the CLI Tool profile (I.3) requires, documented in the README and the repo constitution and read in one place, KatelloClient.from_env."
+
+[[exceptions]]
+check = "EV004-redundant_error_handling"
+path = "src/shiva/cli.py"
+classification = "by_design"
+justification = "A failed summary email is reported on stderr and deliberately does not change the exit code: the hosts' results are already decided and printed, and an MTA outage must not make a successful run look failed."
+
+[[exceptions]]
+check = "EV010-single_use_helpers"
+path = "tests/test_config_hosts_katello.py"
+classification = "gourmand_bug"
+justification = "_katello is called from four tests (paginated hosts, collections, HTTP error, repr); Gourmand counts only one call site, likely because the other calls pass a lambda."
+
+[[exceptions]]
+check = "EV002-manifest_lint_suppression"
+path = "pyproject.toml"
+classification = "by_design"
+justification = "Every ruff ignore carries an inline reason: ssh is run as an argv list found on PATH (S603, S607), and tests use asserts, fixed tmp paths, fake passwords and unused fixture arguments by nature. Deliberate configuration, not suppressions parked for later."

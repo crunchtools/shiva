@@ -1,0 +1,165 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency CVE Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install pip-audit
+        run: uv pip install pip-audit
+
+      - name: Run pip-audit
+        id: audit
+        # pip-audit exits 1 when it finds vulnerabilities; the count below
+        # decides that. A missing or unparseable report must fail the step,
+        # not read as zero -- that is how this gate went silent before.
+        run: |
+          uv run pip-audit --format=json --output=audit-results.json || true
+          uv run pip-audit --format=markdown --output=audit-results.md || true
+
+          VULN_COUNT=$(uv run python -c "import json; d=json.load(open('audit-results.json')); print(sum(1 for p in d['dependencies'] if p.get('vulns')))")
+          echo "vuln_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-audit-results
+          path: |
+            audit-results.json
+            audit-results.md
+          retention-days: 30
+
+      - name: Create issue for vulnerabilities
+        if: steps.audit.outputs.vuln_count != '0' && github.event_name == 'schedule'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Security Vulnerabilities Detected\n\n';
+            body += 'The weekly security scan found vulnerabilities in project dependencies.\n\n';
+
+            if (fs.existsSync('audit-results.md')) {
+              body += fs.readFileSync('audit-results.md', 'utf8');
+            }
+
+            body += '\n\n### Action Required\n';
+            body += '1. Review the vulnerabilities listed above\n';
+            body += '2. Update affected dependencies\n';
+            body += '3. Run `uv sync` and test\n';
+            body += '4. Create a PR with the fixes\n';
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Security Alert: CVEs found in dependencies (${new Date().toISOString().split('T')[0]})`,
+              body: body,
+              labels: ['security', 'dependencies']
+            });
+
+      - name: Fail on vulnerabilities (PRs only)
+        if: steps.audit.outputs.vuln_count != '0' && github.event_name == 'pull_request'
+        run: |
+          echo "::error::Security vulnerabilities found in dependencies. See audit results."
+          exit 1
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build container image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Containerfile
+          push: false
+          tags: shiva:scan
+          load: true
+
+      # Two runs: the SARIF one feeds code scanning and never fails, the table
+      # one gates PRs and prints the findings, which SARIF output hides.
+      - name: Run Trivy vulnerability scanner (SARIF)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: "shiva:scan"
+          scanners: vuln
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: "sarif"
+          output: "trivy-results.sarif"
+          # Without this, trivy-action drops the severity filter for SARIF
+          limit-severities-for-sarif: true
+          exit-code: "0"
+
+      - name: Gate on Trivy findings (PRs only)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: "shiva:scan"
+          scanners: vuln
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: "table"
+          exit-code: "1"
+          skip-setup-trivy: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:python"
