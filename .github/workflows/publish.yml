@@ -7,6 +7,11 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # PyPI trusts only this environment, and the environment admits only
+    # v*.*.* tags, so no other ref can mint a publishing token.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/shiva-crunchtools
     permissions:
       id-token: write
 
