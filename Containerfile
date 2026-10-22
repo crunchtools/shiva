@@ -20,7 +20,15 @@ RUN python3 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir .
+# pip is only needed to build the venv. Its vendored certifi, urllib3, msgpack
+# and setuptools are what Trivy flags in this image, so both copies go.
+RUN pip install --no-cache-dir . && \
+    pip uninstall -y pip && \
+    if rpm -qf /usr/lib/python3*/site-packages/pip >/dev/null 2>&1; then \
+        dnf remove -y "$(rpm -qf --qf '%{NAME}\n' /usr/lib/python3*/site-packages/pip)"; \
+    fi && \
+    rm -rf /usr/lib/python3*/site-packages/pip /usr/lib/python3*/site-packages/pip-*.dist-info && \
+    dnf clean all
 
 LABEL name="shiva" \
       version="1.0.0" \
