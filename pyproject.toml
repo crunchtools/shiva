@@ -1,6 +1,6 @@
 [project]
 name = "shiva-crunchtools"
-version = "1.0.0"
+version = "1.0.1"
 description = "Mass SSH client: run one shell command on many hosts in parallel"
 requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"

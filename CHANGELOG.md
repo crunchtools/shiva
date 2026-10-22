@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-22
+
+### Changed
+- PyPI releases publish only from the `pypi` GitHub environment, which admits
+  only `v*.*.*` tags. First release on PyPI as `shiva-crunchtools`.
+
 ## [1.0.0] - 2026-10-22
 
 Python rewrite of the bash script. The last bash version is tag `v0.5-bash`.
