@@ -1,6 +1,11 @@
-# The one CI job: every check this repo runs, from python-sdlc at the release
-# .pre-commit-config.yaml pins -- the same image and the same commands the
-# laptop runs, so a green push predicts a green CI (constitution XII, v1.30.0).
+# The repo's own checks, from python-sdlc at the release .pre-commit-config.yaml
+# pins -- the same image and the same commands the laptop runs, so a green push
+# predicts a green CI (constitution XII, v1.30.0).
+#
+# NOT every check on this pull request: Gourmand and Gatehouse run as their own
+# workflows, which is why `sdlc ci` leaves them out (XII: "CI runs push's checks
+# except Gourmand and Gatehouse, which CI runs through their own workflows").
+# The Gourmand job below is one of them.
 #
 # The job NAME `sdlc ci` is the required check in the org ruleset "Python SDLC
 # gates". Renaming the job stops it gating, silently.
