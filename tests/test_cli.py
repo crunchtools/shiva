@@ -139,9 +139,7 @@ def test_email_failure_does_not_change_exit(
     assert "could not send email" in capsys.readouterr().err
 
 
-def test_email_sent(
-    config_file: Path, fake_ssh: FakeSSH, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_email_sent(config_file: Path, fake_ssh: FakeSSH, monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[tuple[str, EmailMessage]] = []
 
     class FakeSMTP:

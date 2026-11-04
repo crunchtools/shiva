@@ -115,8 +115,10 @@ def ssh_argv(host: str, options: RunOptions) -> list[str]:
     """ssh argv for HOST. `--` precedes the host so a name cannot be read as an option."""
     argv = [
         "ssh",
-        "-o", "BatchMode=yes",
-        "-o", f"ConnectTimeout={options.ssh_timeout}",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={options.ssh_timeout}",
     ]
     if options.accept_new_keys:
         argv += ["-o", "StrictHostKeyChecking=accept-new"]
