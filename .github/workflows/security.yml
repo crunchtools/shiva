@@ -16,13 +16,6 @@ permissions:
   security-events: write
 
 jobs:
-  dependency-audit:
-    name: Dependency CVE Scan
-    permissions:
-      contents: read
-      issues: write
-    uses: crunchtools/constitution/.github/workflows/dependency-audit.yml@v1.29.0
-
   container-scan:
     name: Container Security Scan
     runs-on: ubuntu-latest

@@ -59,9 +59,7 @@ def test_bad_integers(tmp_path: Path, line: str) -> None:
         load_config(str(path))
 
 
-def test_env_file_does_not_override_shell(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_env_file_does_not_override_shell(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     env = tmp_path / "shiva.env"
     env.write_text("KATELLO_URL=https://from-file\nKATELLO_USERNAME=admin\n")
     monkeypatch.setenv("KATELLO_URL", "https://from-shell")

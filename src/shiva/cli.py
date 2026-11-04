@@ -41,15 +41,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-u", "--user", default="root", help="remote user (default: root)")
     parser.add_argument("-j", "--jobs", type=int, metavar="N", help="hosts at once (max_slots)")
     parser.add_argument(
-        "-t", "--timeout", type=int, metavar="SECONDS",
+        "-t",
+        "--timeout",
+        type=int,
+        metavar="SECONDS",
         help="fail a host whose command runs longer (command_timeout, 0 = none)",
     )
     parser.add_argument(
-        "-A", "--accept-new-keys", action="store_true",
+        "-A",
+        "--accept-new-keys",
+        action="store_true",
         help="accept host keys not seen before (never changed ones)",
     )
     parser.add_argument(
-        "--fact", action="append", default=[], metavar="KEY=VALUE",
+        "--fact",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
         help="run only where facter KEY equals VALUE (KEY!=VALUE negates); repeatable",
     )
     output = parser.add_mutually_exclusive_group()

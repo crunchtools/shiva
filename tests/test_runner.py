@@ -158,9 +158,7 @@ def test_fact_gate_without_facter(tmp_path: Path) -> None:
     )
 
 
-def test_keychain_agent_loaded(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_keychain_agent_loaded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SSH_AUTH_SOCK", raising=False)
     monkeypatch.delenv("SSH_AGENT_PID", raising=False)
     monkeypatch.setattr("shiva.runner.socket.gethostname", lambda: "box")

@@ -72,6 +72,7 @@ max-statements = 50
 "tests/*" = ["S101", "S106", "S108", "PLC0415", "PLR2004", "ARG001", "ARG005"]  # asserts, fake secrets and paths, fixtures
 
 [tool.mypy]
+files = ["src"]
 python_version = "3.11"
 strict = true
 warn_return_any = true
@@ -79,3 +80,14 @@ warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.sdlc.push]
+# No in-repo Semgrep rules: the check exits 2 when .semgrep is absent
+# rather than scanning nothing and calling it a pass.
+skip = ["semgrep"]
+
+[tool.sdlc.ci]
+# The CodeQL Action job uploads to the Security tab and annotates new
+# alerts on the pull request, so CI does not analyse a second time.
+# The push tier still gates on it.
+skip = ["codeql"]
