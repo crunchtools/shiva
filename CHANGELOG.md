@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-10
+
+### Fixed
+- Container installs dependencies from the committed, Dependabot-maintained
+  `uv.lock` instead of a fresh resolve at build time. `pip install .` only
+  read `pyproject.toml`'s floor-pins, so the image could ship versions no
+  test ever ran against (RT#1564; same bug as mcp-gemini's google-genai 3.0
+  outage). A lock stage exports `uv.lock` to a requirements file and both
+  the dependency and project installs use `--no-deps` so pip cannot
+  re-resolve.
+
 ## [1.0.1] - 2026-10-22
 
 ### Changed
