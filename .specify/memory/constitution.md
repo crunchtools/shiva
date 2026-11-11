@@ -3,7 +3,7 @@
 > **Version:** 1.0.0
 > **Ratified:** 2026-10-22
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.31.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.39.1
 > **Profile:** CLI Tool
 
 This file holds shiva's own rules. The fleet rules and the CLI Tool profile apply at
@@ -67,5 +67,5 @@ verification is never disabled.
 ## Container
 
 `quay.io/hummingbird/python:3.14-fips-builder` plus `openssh-clients` (ssh is a runtime
-dependency). Published to `quay.io/crunchtools/shiva` and `ghcr.io/crunchtools/shiva`
+dependency). Published to `quay.io/crunchtools/shiva`
 on `v*.*.*` tags.
