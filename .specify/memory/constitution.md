@@ -3,7 +3,7 @@
 > **Version:** 1.0.0
 > **Ratified:** 2026-10-22
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.39.1
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.40.0
 > **Profile:** CLI Tool
 
 This file holds shiva's own rules. The fleet rules and the CLI Tool profile apply at
