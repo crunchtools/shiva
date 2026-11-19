@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The container release runs constitution v1.51.0's `container-release.yml`
+  (was v1.46.0) and grants it `issues: write`, so a failed scheduled rebuild
+  opens an issue instead of only warning. A `v*` promote now also refuses an
+  image whose `version` label names a different release of this repo, so the
+  release PR must move the Containerfile's `version` label before its merge is
+  tagged; it reads 1.0.2, the current release, so nothing changes today.
+
 ## [1.0.2] - 2026-11-10
 
 ### Fixed
