@@ -88,4 +88,12 @@ skip = ["semgrep"]
 
 
 [tool.sdlc]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+publish = "pypi"
 repo-kinds = ["cli-tool"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/shiva"
+boot = "command"
+boot-command = "podman run --rm \"$IMAGE\" --version\npodman run --rm --entrypoint ssh \"$IMAGE\" -V\n"
