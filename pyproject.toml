@@ -88,4 +88,32 @@ skip = ["semgrep"]
 
 
 [tool.sdlc]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+publish = "pypi"
 repo-kinds = ["cli-tool"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/shiva"
+# sdlc does not enforce boot = "command" (crunchtools/sdlc#118). A CLI image has
+# no long-running process to boot, so the gate is the [tool.sdlc.ci] boot-*
+# checks, run inside the image this PR builds.
+boot = "none"
+boot-none-reason = "a CLI image with no long-running process; the boot gate is the [tool.sdlc.ci] boot-* checks against this PR's built image"
+
+[tool.sdlc.ci]
+checks = ["shiva-image", "boot-version", "boot-ssh"]
+
+[tool.sdlc.ci.shiva-image]
+kind = "image-build"
+
+[tool.sdlc.ci.boot-version]
+kind = "command"
+image = "localhost/shiva:sdlc"
+argv = ["shiva", "--version"]
+
+# The image installs openssh-clients at build time; shiva is useless without ssh.
+[tool.sdlc.ci.boot-ssh]
+kind = "command"
+image = "localhost/shiva:sdlc"
+argv = ["ssh", "-V"]
